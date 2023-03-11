@@ -39,13 +39,25 @@ CONTROL_KEYS = {
 }
 
 
-def make_trame(
-    cmds_in: set[ControlKeys], message: str, cmds_out: set[ControlKeys]
+def make_mouse_trame(up_down: int, left_right: int, wheel: int) -> bytes:
+    trame = "\x01M"
+    if up_down:
+        trame += f"\x02V{up_down}\x03"
+    if left_right:
+        trame += f"\x02H{left_right}\x03"
+    if wheel:
+        trame += f"\x02W{wheel}\x03"
+    trame += "\x02S!\x03\x04"
+    return trame.encode()
+
+
+def make_keyboard_trame(
+        pressed: set[ControlKeys], message: str, released: set[ControlKeys]
 ) -> bytes:
-    trame = "\x01"
-    for ctrl in cmds_in:
+    trame = "\x01K\x02^"
+    for ctrl in pressed:
         trame += ctrl.value
-    trame += "\x02"
+    trame += "\x03\x02%"
     special = False
     for c in message:
         if c == "$":
@@ -55,10 +67,10 @@ def make_trame(
             special = False
         else:
             trame += c
-    trame += "\x03"
-    for ctrl in cmds_out:
+    trame += "\x03\x02$"
+    for ctrl in released:
         trame += ctrl.value
-    trame += "\x04"
+    trame += "\x03\x04"
     return trame.encode()
 
 
@@ -72,6 +84,7 @@ def connect(ip: str = DEFAULT_IP, port: int = DEFAULT_PORT) -> socket.socket:
 MENU = (
     "[bold][blue]M[/bold]: Message[/blue]\n"
     "[bold][cyan]C[/bold]: Command[/cyan]\n"
+    "[bold][magenta]S[/bold]: Mouse[/magenta]\n"
     "[bold][red]Q[/bold]: Quit[/red]\n> "
 )
 
@@ -85,30 +98,36 @@ def main():
     _port = int(_port) if _port else DEFAULT_PORT
     sock = connect(_ip, _port)
     while (opt := console.input(MENU)) != "Q":
-        if opt == "M":
-            header = set()
-            footer = set()
-            msg = console.input("Header to send:\n> ")
-            for c in msg:
-                if c in CONTROL_KEYS.keys():
-                    header.add(CONTROL_KEYS[c])
-            message = console.input("Message to send:\n> ")
-            msg = console.input("Footer to send:\n> ")
-            for c in msg:
-                if c in CONTROL_KEYS.keys():
-                    footer.add(CONTROL_KEYS[c])
-            sock.send(make_trame(header, message, footer))
-        elif opt == "C":
-            cmd = console.input("Command:\n> ")
-            if cmd in COMMANDS.keys():
-                command(COMMANDS[cmd], sock)
-            else:
-                console.print(f"Unknown command: {cmd}")
-        else:
-            console.print(f"Unknown option: {opt}")
+        match opt:
+            case "M":
+                header = set()
+                footer = set()
+                msg = console.input("Header to send:\n> ")
+                for c in msg:
+                    if c in CONTROL_KEYS.keys():
+                        header.add(CONTROL_KEYS[c])
+                message = console.input("Message to send:\n> ")
+                msg = console.input("Footer to send:\n> ")
+                for c in msg:
+                    if c in CONTROL_KEYS.keys():
+                        footer.add(CONTROL_KEYS[c])
+                sock.send(make_keyboard_trame(header, message, footer))
+            case "C":
+                cmd = console.input("Command:\n> ")
+                if cmd in COMMANDS.keys():
+                    keyboard_command(COMMANDS[cmd], sock)
+                else:
+                    console.print(f"Unknown command: {cmd}")
+            case "S":
+                ud = console.input("VERTICAL:\n> ")
+                lr = console.input("HORIZONTAL:\n> ")
+                wh = console.input("WHEEL:\n> ")
+                sock.send(make_mouse_trame(int(ud), int(lr), int(wh)))
+            case _:
+                console.print(f"Unknown option: {opt}")
 
 
-def command(cmd: Commands, sock: socket.socket | None) -> None:
+def keyboard_command(cmd: Commands, sock: socket.socket | None) -> None:
     if sock is None:
         sock = connect()
     match cmd:
@@ -133,7 +152,7 @@ def command(cmd: Commands, sock: socket.socket | None) -> None:
         case _:
             cmds = []
     for _command, _timeout in cmds:
-        trame = make_trame(*_command)
+        trame = make_keyboard_trame(*_command)
         console.print(f"sending {trame}")
         sock.send(trame)
         time.sleep(_timeout)

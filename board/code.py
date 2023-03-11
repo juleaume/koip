@@ -18,16 +18,30 @@ SPECIAL_KEYS = {
 }
 
 KEYBOARD_KEYS = {
-    0x09: Keycode.TAB,
-    0x0A: Keycode.RETURN,
+    ord("\t"): Keycode.TAB,
+    ord("\n"): Keycode.RETURN,
 }
-
 
 TRAME = {
     0x01: "HEADER",
     0x02: "MESSAGE",
-    0x03: "FOOTER",
+    0x03: "ETX",
     0x04: "EOT",
+}
+
+COMMAND_TYPE = {ord("K"): "KEYBOARD", ord("M"): "MOUSE", ord("C"): "CONFIGURE"}
+
+SEND_TYPE = {
+    ord("^"): "PRESS",
+    ord("%"): "SEND",
+    ord("$"): "RELEASE",
+}
+
+MOUSE_DIRECTION = {
+    ord("V"): "VERTICAL",
+    ord("H"): "HORIZONTAL",
+    ord("W"): "WHEEL",
+    ord("S"): "SEND"
 }
 
 led = digitalio.DigitalInOut(board.LED)
@@ -62,45 +76,72 @@ current_portion = "EOT"
 led.value = True
 while True:
     r = sock.recv_into(buffer)
-    # message format is
-    # \x01CTRL?GUI?ALT?ALTGR?\x02MESSAGE\x03CTRL?GUI?ALT?ALTGR?\x04
-    # [ H E A D E R]          [MESSAGE]     [ F O O T E R ]
-    # The header presses the control keys
-    # the message writes keyboards
-    # the footer releases the control keys
     message = buffer[: (r + 1)]
+    command_type = ""
+    send_type = ""
+    direction = ""
+    up_down = ""
+    left_right = ""
+    wheel = ""
     for char in message:
         led.value = not led.value
         if char in TRAME.keys():
             current_portion = TRAME[char]
-            continue
+            if current_portion == "ETX":
+                send_type = ""
         elif current_portion == "HEADER":
-            _key = SPECIAL_KEYS.get(char, 0)
-            print(f"pressing {_key}")
-            keyboard.press(_key)
+            command_type = COMMAND_TYPE.get(char, "")
         elif current_portion == "MESSAGE":
-            print("MESSAGE TIME")
-            if char >= 0x20:
-                print(f"writing {chr(char)}")
-                k_layout.write(chr(char))
-            else:
-                if char in SPECIAL_KEYS.keys():
-                    _key = SPECIAL_KEYS[char]
-                elif char in KEYBOARD_KEYS.keys():
-                    _key = KEYBOARD_KEYS[char]
+            if command_type == "KEYBOARD":
+                # message format is
+                # \x01K\x02press\x03\x02send\x03\x02release\x03\x04
+                # press is keys to press down
+                # send is keys to send
+                # release is keys to release up
+                if send_type == "PRESS":
+                    # PRESS MODE
+                    _key = SPECIAL_KEYS.get(char, 0)
+                    keyboard.press(_key)
+                elif send_type == "RELEASE":
+                    # RELEASE MODE
+                    _key = SPECIAL_KEYS.get(char, 0)
+                    keyboard.release(_key)
+                elif send_type == "SEND":
+                    # SENDING MODE
+                    if char >= 0x20:
+                        k_layout.write(chr(char))
+                    else:
+                        if char in SPECIAL_KEYS.keys():
+                            _key = SPECIAL_KEYS[char]
+                        elif char in KEYBOARD_KEYS.keys():
+                            _key = KEYBOARD_KEYS[char]
+                        else:
+                            continue
+                        keyboard.send(_key)
+                elif char in SEND_TYPE.keys():
+                    send_type = SEND_TYPE[char]
                 else:
-                    print(f"Unknown char: {char}")
                     continue
-                print(f"sending {_key} (0x{char:02X})")
-                keyboard.send(_key)
-
-        elif current_portion == "FOOTER":
-            _key = SPECIAL_KEYS.get(char, 0)
-            print(f"releasing {_key}")
-            keyboard.release(_key)
+            elif command_type == "MOUSE":
+                if char in MOUSE_DIRECTION.keys():
+                    direction = MOUSE_DIRECTION[char]
+                elif direction == "VERTICAL":
+                    up_down += chr(char)
+                elif direction == "HORIZONTAL":
+                    left_right += chr(char)
+                elif direction == "WHEEL":
+                    wheel += chr(char)
+                elif direction == "SEND":
+                    if not left_right:
+                        left_right = 0
+                    if not up_down:
+                        up_down = 0
+                    if not wheel:
+                        wheel = 0
+                    mouse.move(int(left_right), int(up_down), )
+        elif current_portion == "ETX":
+            continue
         elif current_portion == "EOT":
-            print("BYE-BYE")
             break
         else:
-            print("EH??? TIME")
             continue
