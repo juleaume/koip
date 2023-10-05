@@ -82,7 +82,10 @@ def main():
                 ud = console.input("VERTICAL:\n> ")
                 lr = console.input("HORIZONTAL:\n> ")
                 wh = console.input("WHEEL:\n> ")
-                sock.send(make_mouse_trame(int(ud), int(lr), int(wh)))
+                hor = int(ud) if ud else 0
+                ver = int(lr) if lr else 0
+                scr = int(wh) if wh else 0
+                sock.send(make_mouse_trame(hor, ver, scr))
             case _:
                 console.print(f"Unknown option: {opt}")
 
