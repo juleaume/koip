@@ -19,6 +19,7 @@ DEFAULT_PORT = 5000
 
 class Commands(Enum):
     slack = auto()
+    slqck = auto()
     chrome = auto()
     term = auto()
 
@@ -107,6 +108,14 @@ def keyboard_command(cmd: Commands, sock: socket.socket | None) -> None:
                 ((set(), "$Ck", set()), 0.5),
                 ((set(), "general$E", set()), 0.5),
                 ((set(), "Je ramene le prochain petit dej$E", set()), 0.5),
+            ]
+        case Commands.slqck:
+            cmds = [
+                ((set(), "$G", set()), 0.5),
+                ((set(), "slqck$E", set()), 1),
+                ((set(), "$Ck", set()), 0.5),
+                ((set(), "generql$E", set()), 0.5),
+                ((set(), "Je rqm7ne le prochqin petit d2j$E", set()), 0.5),
             ]
         case _:
             cmds = []
