@@ -27,9 +27,7 @@ class Commands(Enum):
 COMMANDS = {_c.name: _c for _c in Commands}
 
 
-def connect(
-    ip: str = DEFAULT_IP, port: int = DEFAULT_PORT
-) -> socket.socket | None:
+def connect(ip: str = DEFAULT_IP, port: int = DEFAULT_PORT) -> socket.socket | None:
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         sock.connect((ip, port))
@@ -108,17 +106,19 @@ def keyboard_command(cmd: Commands, sock: socket.socket | None) -> None:
             cmds = [
                 ((set(), "$G", set()), 0.5),
                 ((set(), "slack$E", set()), 1),
-                ((set(), "$Ck", set()), 0.5),
+                (({ControlKeys.ctrl}, "k", {ControlKeys.ctrl}), 0.5),
                 ((set(), "general$E", set()), 0.5),
                 ((set(), "Je ramene le prochain petit dej$E", set()), 0.5),
+                ({ControlKeys.gui}, "l", {ControlKeys.gui}),
             ]
         case Commands.slqck:
             cmds = [
                 ((set(), "$G", set()), 0.5),
                 ((set(), "slqck$E", set()), 1),
-                ((set(), "$Ck", set()), 0.5),
+                (({ControlKeys.ctrl}, "k", {ControlKeys.ctrl}), 0.5),
                 ((set(), "generql$E", set()), 0.5),
                 ((set(), "Je rqm7ne le prochqin petit d2j$E", set()), 0.5),
+                ({ControlKeys.gui}, "l", {ControlKeys.gui}),
             ]
         case _:
             cmds = []
